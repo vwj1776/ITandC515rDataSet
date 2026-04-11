@@ -115,14 +115,22 @@ def generate_overall_summary(recovered_csv, sample_csv, output_csv):
 
 def generate_visualization(df_summary, output_img):
     print("\n--- PHASE 3: Data Visualization ---")
-    plt.figure(figsize=(12, 6))
     
-    sns.barplot(data=df_summary, x='Deletion_Method', y='Percentage', hue='Recovery_Method')
+    # Create a grouped bar chart split into two columns by Drive Type
+    g = sns.catplot(
+        data=df_summary, 
+        x='Deletion_Method', 
+        y='Percentage', 
+        hue='Recovery_Method', 
+        col='Drive Type', 
+        kind='bar',
+        height=6, 
+        aspect=1.2
+    )
     
-    plt.title('Average Recovery Success Rate by Deletion Method')
-    plt.ylabel('Recovery Percentage (%)')
-    plt.xlabel('Deletion Method')
-    plt.tight_layout()
+    g.fig.subplots_adjust(top=0.85) # Make room for the main title
+    g.fig.suptitle('Average Recovery Success Rate by Deletion Method and Drive Type')
+    g.set_axis_labels('Deletion Method', 'Recovery Percentage (%)')
     
     plt.savefig(output_img)
     print(f"Success! Visualization saved to: {output_img}")

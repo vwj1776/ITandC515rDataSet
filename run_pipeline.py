@@ -24,8 +24,29 @@ def generate_master_summary(recovered_csv, sample_csv, output_csv):
     # Calculate baseline sample sizes per file type
     sample_totals = df_sample.groupby('File_Type').size().to_dict()
     
+    # Identify all valid testing combinations that were physically run
+    valid_tests = df_recovered[['Drive', 'Deletion_Method']].drop_duplicates().to_dict('records')
+    recovery_methods = df_recovered['Recovery_Method'].unique()
+    
+    # Create expected combinations to ensure completely failed recoveries (0%) are included
+    expected_rows = []
+    for test in valid_tests:
+        for rm in recovery_methods:
+            for ft in sample_totals.keys():
+                expected_rows.append({
+                    'Drive': test['Drive'],
+                    'Deletion_Method': test['Deletion_Method'],
+                    'Recovery_Method': rm,
+                    'File_Type': ft
+                })
+    df_expected = pd.DataFrame(expected_rows)
+
     # Group and count recoveries
     counts = df_recovered.groupby(['Drive', 'Recovery_Method', 'Deletion_Method', 'File_Type']).size().reset_index(name='Total_Recovered')
+    
+    # Merge expected with actual counts, filling any missing tests with 0 recoveries
+    counts = pd.merge(df_expected, counts, on=['Drive', 'Recovery_Method', 'Deletion_Method', 'File_Type'], how='left')
+    counts['Total_Recovered'] = counts['Total_Recovered'].fillna(0)
     
     # Calculate true percentages based on exact sample size
     counts['Percentage'] = counts.apply(
@@ -48,13 +69,31 @@ def generate_overall_summary(recovered_csv, sample_csv, output_csv):
     df_recovered = pd.read_csv(recovered_csv)
     df_sample = pd.read_csv(sample_csv)
     
-    # Extract file types to safely filter out artifact/broken files (.z, .zz)
-    df_recovered['File_Type'] = df_recovered['File_Name'].apply(get_extension)
     # Calculate total files in the entire baseline sample
     total_sample_files = len(df_sample['Just_The_Filename'].dropna())
     
+    # Identify all valid testing combinations that were physically run
+    valid_tests = df_recovered[['Drive', 'Deletion_Method']].drop_duplicates().to_dict('records')
+    recovery_methods = df_recovered['Recovery_Method'].unique()
+    
+    # Create expected combinations for the overall summary
+    expected_rows = []
+    for test in valid_tests:
+        for rm in recovery_methods:
+            expected_rows.append({
+                'Drive': test['Drive'],
+                'Deletion_Method': test['Deletion_Method'],
+                'Recovery_Method': rm
+            })
+    df_expected = pd.DataFrame(expected_rows)
+
     # Group by Drive, Recovery Method, and Deletion Method
     counts = df_recovered.groupby(['Drive', 'Recovery_Method', 'Deletion_Method']).size().reset_index(name='Total_Recovered')
+    
+    # Merge expected with actual counts, filling any missing tests with 0 recoveries
+    counts = pd.merge(df_expected, counts, on=['Drive', 'Recovery_Method', 'Deletion_Method'], how='left')
+    counts['Total_Recovered'] = counts['Total_Recovered'].fillna(0)
+    
     counts['Percentage'] = ((counts['Total_Recovered'] / total_sample_files) * 100).round(2)
     
     # Map Drive Type and S/N based on known dataset structure
